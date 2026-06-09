@@ -1,0 +1,53 @@
+# ---------------------------------------------------------------------------
+# Generated data & model artifacts
+# ---------------------------------------------------------------------------
+# Everything under data/ and models/ is reproducible from the pipeline
+# (`make all`), so we don't commit it. We keep the directories themselves
+# via the tracked .gitkeep files.
+data/*
+!data/.gitkeep
+models/*
+!models/.gitkeep
+
+*.db
+*.sqlite
+*.sqlite3
+*.joblib
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# ---------------------------------------------------------------------------
+# Virtual environments
+# ---------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------------------------------------------------------------------------
+# Secrets — never commit API keys
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------------------------------------------------------
+# Editor / OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
