@@ -1,12 +1,3 @@
-"""
-Central configuration: paths, random seed, and the real STATEC open-data
-resource identifiers used by the ingestion layer.
-
-Keeping this in one place means the rest of the codebase never hard-codes a
-path or a magic number, and a reviewer can see every external dependency at a
-glance.
-"""
-
 from __future__ import annotations
 
 import os
