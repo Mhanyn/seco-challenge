@@ -27,7 +27,7 @@ The sections below answer the questions in the brief, then set out the results, 
 
 The user is SECO's technical-control team: the experts who assess projects and the people who route incoming work to them.
 
-The problem is risk analysis, not scheduling. Today technical risk is judged manually and qualitatively, one project at a time. Three things follow:
+Today technical risk is judged manually and qualitatively, one project at a time. Three things follow:
 
 - Assessments vary between experts, so two comparable projects can receive different judgements.
 - There is no early, systematic signal, so a genuinely high-risk project is often recognised late, once a defect is already expensive to fix.
@@ -35,7 +35,7 @@ The problem is risk analysis, not scheduling. Today technical risk is judged man
 
 What is missing is a consistent, data-driven risk assessment, available at intake before work starts, that encodes domain expertise, stays fully explainable and auditable, and gives experts a shared, objective baseline they can trust and build on. ERA is exactly that baseline: for every project it produces a risk band, a 0 to 100 risk index, and the drivers behind the score.
 
-A consequence, not the use case: once every project carries a consistent risk rating, SECO can run its portfolio by risk and put its most experienced experts on the riskiest projects, with lighter-touch review on low-risk work. That operating-model gain follows from good risk analysis; it is a benefit of the use case, not the use case itself.
+A consequence: once every project carries a consistent risk rating, SECO can run its portfolio by risk and put its most experienced experts on the riskiest projects, with lighter-touch review on low-risk work. That operating-model gain follows from good risk analysis.
 
 ## 2. Why is this relevant to SECO?
 
@@ -52,25 +52,24 @@ The value compounds. Earlier and more precise detection lowers remediation and r
 
 ## 3. Which data sources were used, and why?
 
-The real, public, openly licensed source is STATEC Autorisations de batir (building permits) on data.public.lu, published under Creative Commons Zero. This is genuine Luxembourg construction activity broken down by building type, canton, and period, which the brief's reproducibility requirement calls for.
+The real, public, openly licensed source is STATEC Autorisations de batir (building permits) on data.public.lu, published under Creative Commons Zero. This is  Luxembourg construction activity broken down by building type, canton, and period.
 
-The honest constraint, which shapes the whole design, is that this open dataset is aggregate statistics, not per-project records, and it carries no risk or defect outcome. The data that would carry a real risk label is SECO's confidential inspection history, which is not available for a take-home. The response is the hybrid approach the brief suggests, and the only honest one given the data:
+The honest constraint, which shapes the whole design, is that this open dataset is aggregate statistics, not per-project records, and it carries no risk or defect outcome. The data that would carry a real risk label is SECO's confidential inspection history, which is not available pubblicly. The response is a hybrid approach:
 
 1. Base features are sampled from the real distribution. The ingest step records provenance from the live data.public.lu API and builds a sampling prior over building type and canton, so the synthetic portfolio's geography and building mix match reality.
 2. A documented risk label is attached from a transparent latent function that encodes construction-domain assumptions: renovations and load-bearing masonry are riskier than new reinforced-concrete builds, winter starts are riskier than summer, low contractor experience and high site complexity raise risk, and both very small and very large projects are riskier than mid-sized ones.
 
-The label is deliberately not rigged to look easy. It mixes several drivers, adds genuine noise so the outcome is probabilistic, includes a non-linear size effect and a masonry-by-renovation interaction, and includes a deliberate red-herring feature, permit processing time, that carries no risk signal. A good model has to learn to ignore it. That it does (see Results) is part of the evidence the pipeline behaves correctly.
+The label is deliberately not rigged to look easy. It mixes several drivers, adds genuine noise so the outcome is probabilistic, includes a non-linear size effect and a masonry-by-renovation interaction, and includes a deliberate red-herring feature, permit processing time, that carries no risk signal. A good model has to learn to ignore it. That it does (see Results) is part of the evidence the pipeline worsk correctly.
 
 ## 4. Technical decisions and trade-offs
 
 | Decision | Reasoning | Trade-off accepted |
 |---|---|---|
 | SQLite for storage | Zero infrastructure, file-based, reproducible, easy to inspect. The schema is layered (provenance, then projects, then predictions) to make data lineage explicit. | Not concurrent and not a warehouse. Maps cleanly onto Postgres later without changing application logic. |
-| Streamlit for the interface | Fastest path to a usable, data-rich assessment interface for one engineer on a short budget. The value is in the data, the model, and the explanations. | React is the right choice for a multi-user, role-aware production application. Streamlit is the deliberate prototype trade. |
-| scikit-learn, two models benchmarked | A regularised logistic-regression baseline is benchmarked against a gradient-boosted model, and whichever wins on held-out macro F1 is deployed. Honest and data-driven rather than reaching for the fanciest model. | On this largely additive label the linear model wins and ships; the gradient-boosted model is retained and would be picked up automatically on SECO's richer real data. |
+| Streamlit for the interface | Fastest path to a usable, data-rich assessment interface for a a short call & budget. The value is in the data, the model, and the explanations. | React is the right choice for a multi-user, role-aware production application. |
+| scikit-learn, two models benchmarked | A regularised logistic-regression baseline is benchmarked against a gradient-boosted model, and whichever wins on held-out macro F1 is deployed. Turstworthy and data-driven rather than reaching for the most sopisticated model. | On this largely additive label the linear model wins and ships; the gradient-boosted model is retained and would be picked up automatically on SECO's richer real data. |
 | Preprocessing inside the model pipeline | Encoding and scaling live inside the persisted artifact, which removes train-serve skew and lets raw project rows be scored directly. | Slightly less control than a separate feature store, which only matters at larger scale. |
 | Explanations in the original feature space | Drivers are attributed in the inspector's vocabulary by ablation, with no extra dependency, so a rating can always be justified. | SHAP is wired in as an optional path that auto-selects the right explainer for the deployed model and has been verified to agree with ablation on the top drivers. |
-| Language-model briefing is optional | The model only turns the structured drivers into prose; with no API key a deterministic template produces the same content. | Briefing prose is plainer without a key. The product is fully functional and reproducible offline. |
 
 Built for trust, the three principles that run through the build:
 
@@ -89,7 +88,7 @@ What is already the right shape and would ship:
 
 What would be replaced:
 
-- the demonstration label, replaced by SECO's real historical inspection outcomes. The system is built so this is a label-source swap and a retrain, not a rewrite. This is the single most important property of the design.
+- the demonstration label, replaced by SECO's real historical inspection outcomes. The system is built so this is a label-source swap and a retrain, not a rewrite.
 - the offline sampling prior, replaced by the parsed LUSTAT SDMX feed and, ideally, project-level records,
 - SQLite, replaced by managed Postgres, and Streamlit, replaced by a React front end over a scoring API.
 
@@ -111,7 +110,7 @@ The model separates risk well, recovers sensible drivers, and ignores the plante
 - Two independent explanation methods, ablation and SHAP, agree on the same top drivers.
 - The top drivers match technical-control experience: type of works, age of the existing structure, structural system, site complexity, and contractor track record.
 
-Honest read: these numbers validate the pipeline, the product, and the workflow, not real-world predictive accuracy, because the label is synthetic. Real validity requires SECO's labelled data, at which point the same code retrains and the same application works unchanged.
+How to readthis: these numbers validate the pipeline, the product, and the workflow, not real-world predictive accuracy, because the label is synthetic. Real validity requires SECO's labelled data, at which point the same code retrains and the same application works unchanged.
 
 ## Roadmap: ERA expansion and adoption
 
@@ -123,17 +122,6 @@ The build and the adoption journey advance together, so trust is earned before t
 | Enrich (3 to 6 months) | Add document and defect-image reading, drift monitoring, and an inspector feedback loop. | Move to assisted mode, train experts to read the drivers rather than just the score, and log every override. |
 | Productionise (6 to 9 months) | Managed database, React front end, scoring API, role-based access. | Embed in the workflow, run the portfolio by risk, and assign the riskiest projects to the most experienced experts. |
 | Sustain (continuous) | Model versioning, full audit trail, automation bias managed. | Track override rate, time to assess, high-risk caught early, and expert hours reallocated to high-risk work. |
-
-## Adoption and change management
-
-The model is the easy part. Whether ERA delivers value depends on whether experts adopt it, so the rollout treats trust, not accuracy, as the hard problem.
-
-- Explanations are the adoption mechanism. A score with a reason the expert recognises gets used; a black box gets ignored. The drivers are shown in the expert's vocabulary precisely so the reasoning can be audited on each project.
-- The tool supports, it does not decide. ERA ranks and explains; the expert decides and stays accountable. This is both the correct safety posture and what makes adoption possible, because it does not threaten professional authority or deskill the role.
-- Overrides are signal, not failure. Every disagreement between ERA and an expert is logged and becomes training data, which improves the model and keeps the expert in control.
-- Automation bias is the main risk to manage. The rating is never an automatic pass or fail; it surfaces uncertainty, keeps a human accountable, and keeps a full audit trail so any rating can be reconstructed and defended.
-
-The operating-model consequence is the payoff: once risk is assessed consistently, SECO can manage the portfolio by risk and put its most experienced experts where risk is highest, with lighter-touch review on low-risk work.
 
 ## Tracking value creation
 
