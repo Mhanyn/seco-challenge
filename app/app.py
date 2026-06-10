@@ -1,4 +1,4 @@
-"""ERA Expert System: inspection-planning decision support.
+"""SECO ERA Expert System: inspection-planning decision support.
 
 A professional dashboard for SECO technical-control planners. It does four
 things, one per tab:
