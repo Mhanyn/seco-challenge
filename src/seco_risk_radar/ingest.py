@@ -12,8 +12,7 @@ Responsibilities
 
 Design choice: the network call is best-effort. If there is no connectivity
 (or the platform shape changes), we fall back to a documented prior built from
-the taxonomy. This keeps the whole pipeline reproducible offline, which the
-brief explicitly requires ("everything must be public and reproducible").
+the taxonomy. This keeps the whole pipeline reproducible offline.
 
 The production path for richer data is to parse the LUSTAT SDMX-JSON feed
 behind each resource; that is listed as a "3-months" item in the README.
