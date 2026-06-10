@@ -1,28 +1,3 @@
-#!/usr/bin/env bash
-# ===========================================================================
-# git_setup.sh — initialise a readable, thematic git history for Risk Radar
-# ===========================================================================
-# WHY THIS EXISTS
-# ---------------
-# The brief says a single "initial commit" is a bad signal, and they're right:
-# it hides how the project was built. The honest ideal is to commit
-# incrementally *as you work*. This repo was assembled in one focused session
-# with AI-assisted tooling (which the brief explicitly allows), so this script
-# replays that work as a sequence of logical commits — scaffold, then data,
-# then storage, model, explainability, UI, tests, docs — in the order a person
-# would naturally build it. Each commit is self-contained and tells part of
-# the story. It is NOT an attempt to fake months of history; it's a faithful,
-# legible reconstruction of the build order.
-#
-# USAGE
-# -----
-#   1. Review the commits below — adjust messages/grouping to taste.
-#   2. Run:   bash git_setup.sh
-#   3. Create an empty repo on GitHub (no README/licence — we have those).
-#   4. Then follow the "PUSH" instructions printed at the end.
-#
-# Safe to read first; it only touches THIS directory's git state.
-# ===========================================================================
 set -euo pipefail
 
 if [ -d .git ]; then
@@ -99,22 +74,3 @@ echo
 echo "Done. Local history:"
 git --no-pager log --oneline
 cat <<'EOF'
-
-------------------------------------------------------------------------
-PUSH TO GITHUB
-------------------------------------------------------------------------
-1. Create a new EMPTY repo on GitHub named e.g. seco-risk-radar
-   (do not initialise it with a README, .gitignore or licence).
-
-2. Connect and push (replace YOUR_USERNAME):
-
-     git branch -M main
-     git remote add origin https://github.com/YOUR_USERNAME/seco-risk-radar.git
-     git push -u origin main
-
-3. If you make the repo PRIVATE, add the reviewer as a collaborator:
-   GitHub -> repo -> Settings -> Collaborators -> add "RaiSECO".
-
-4. Send the repo link before the Wednesday 10 June 2026 deadline.
-------------------------------------------------------------------------
-EOF
