@@ -1,22 +1,3 @@
-"""
-Natural-language inspector briefing.
-
-This is the LLM component. Its job is narrow and honest: it TRANSLATES the
-already-computed structured risk output (band, score, top driver factors) into
-a short briefing an inspector can read. It does NOT make the prediction.
-
-Design principle: the LLM is an enhancement layer, never on the critical path.
-If no API key is configured, we generate a deterministic template briefing from
-the same structured factors. The product is therefore fully functional and
-reproducible offline; the LLM just makes the prose nicer. This is a deliberate
-robustness/cost decision worth defending in the interview.
-
-Providers tried (first available wins):
-  * Anthropic   (ANTHROPIC_API_KEY)
-  * OpenAI      (OPENAI_API_KEY)
-  * Template    (always available, no network)
-"""
-
 from __future__ import annotations
 
 import os
