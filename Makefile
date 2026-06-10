@@ -1,5 +1,5 @@
 # ===========================================================================
-# SECO Risk Radar - reproducible developer workflow
+# SECO ERA Expert System - reproducible developer workflow
 # ===========================================================================
 # Run `make help` to see available targets. The happy path is simply:
 #
@@ -7,7 +7,7 @@
 #     make all      # pipeline -> train -> predict
 #     make app       # launch the dashboard
 #
-# PYTHON can be overridden, e.g.  make train PYTHON=python3.12
+# PYTHON can be overridden.
 # N controls how many synthetic projects the pipeline generates.
 # ===========================================================================
 
