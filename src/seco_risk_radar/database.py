@@ -1,19 +1,3 @@
-"""
-Storage layer (SQLite).
-
-Why SQLite: zero-infrastructure, file-based, fully reproducible, and trivially
-inspectable with any SQLite browser. For an MVP that a single reviewer must be
-able to clone and run, it beats standing up Postgres. The schema is deliberately
-layered so the data lineage is visible:
-
-    provenance   -- where the data came from (audit trail)
-    projects     -- the cleaned/structured project portfolio (one row/project)
-    predictions  -- model outputs joined back to projects (scores + bands)
-
-In production this same schema maps cleanly onto a warehouse (raw -> staging ->
-marts); the README explains that migration path.
-"""
-
 from __future__ import annotations
 
 import json
