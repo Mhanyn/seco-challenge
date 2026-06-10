@@ -102,17 +102,95 @@ def local_factors(
 
 
 # ---- Optional SHAP path (used only if shap is installed) --------------------
-def shap_local(pipe: Pipeline, project_row: pd.Series):  # pragma: no cover
-    """Optional: SHAP values for the deployed model. Requires `pip install shap`."""
+def _map_to_original_features(feature_names) -> list[str]:
+    """Map each transformed column (e.g. 'cat__works_type_Renovation') back to
+    its source feature ('works_type'), so SHAP values can be aggregated into the
+    original, human-readable feature space."""
+    mapped = []
+    for name in feature_names:
+        stripped = name.split("__", 1)[1] if "__" in name else name
+        original = stripped
+        if stripped not in NUMERIC_FEATURES:
+            for feat in CATEGORICAL_FEATURES:
+                if stripped == feat or stripped.startswith(feat + "_"):
+                    original = feat
+                    break
+        mapped.append(original)
+    return mapped
+
+
+def shap_local(
+    pipe: Pipeline,
+    project_row: pd.Series,
+    reference: pd.DataFrame,
+    top_k: int = 5,
+    class_name: str = "High",
+) -> list[dict]:  # pragma: no cover - runs only when `shap` is installed
+    """Optional SHAP attribution for a single project, in the original feature space.
+
+    Auto-selects the correct explainer for whichever model is deployed
+    (LinearExplainer for logistic regression, TreeExplainer for gradient
+    boosting, a model-agnostic explainer otherwise), computes SHAP values for
+    the chosen class, then aggregates the one-hot columns back to their source
+    feature so the output matches :func:`local_factors`.
+
+    Requires ``pip install shap``. Returns a list of
+    ``{feature, value, contribution}`` sorted by contribution (risk-raising first).
+    """
     try:
-        import shap  # noqa: F401
+        import shap
     except ImportError as exc:
         raise RuntimeError(
-            "SHAP not installed. `pip install shap` or use local_factors()."
+            "SHAP not installed. Run `pip install shap`, or use local_factors() "
+            "(the default explainer, which needs no extra dependency)."
         ) from exc
+
+    import numpy as np
+
     pre = pipe.named_steps["pre"]
     clf = pipe.named_steps["clf"]
-    X = pd.DataFrame([project_row[FEATURES].to_dict()])
-    Xt = pre.transform(X)
-    explainer = shap.TreeExplainer(clf)
-    return explainer.shap_values(Xt)
+    classes = list(clf.classes_)
+    cls_idx = classes.index(class_name) if class_name in classes else len(classes) - 1
+
+    # Background sample for the explainer (capped for speed).
+    bg = reference[FEATURES]
+    if len(bg) > 100:
+        bg = bg.sample(100, random_state=42)
+    bg_t = np.asarray(pre.transform(bg))
+    x_t = np.asarray(pre.transform(pd.DataFrame([project_row[FEATURES].to_dict()])))
+
+    name = type(clf).__name__.lower()
+    is_linear = any(k in name for k in ("logistic", "linear", "ridge", "sgd"))
+    is_tree = any(k in name for k in ("gradientboosting", "forest", "tree", "xgb", "lgbm", "catboost"))
+
+    if is_linear:
+        values = shap.LinearExplainer(clf, bg_t).shap_values(x_t)
+    elif is_tree:
+        values = shap.TreeExplainer(clf).shap_values(x_t)
+    else:
+        values = shap.Explainer(clf.predict_proba, bg_t)(x_t).values
+
+    # Normalise the various SHAP output shapes to a 1-D vector for our row/class.
+    if isinstance(values, list):                  # list of (n_samples, n_feat) per class
+        row = np.asarray(values[min(cls_idx, len(values) - 1)])[0]
+    else:
+        arr = np.asarray(values)
+        if arr.ndim == 3:                         # (n_samples, n_feat, n_classes)
+            row = arr[0, :, min(cls_idx, arr.shape[2] - 1)]
+        elif arr.ndim == 2:                       # (n_samples, n_feat)
+            row = arr[0]
+        else:
+            row = arr.ravel()
+
+    # Aggregate transformed columns back to original features.
+    originals = _map_to_original_features(list(pre.get_feature_names_out()))
+    agg: dict[str, float] = {}
+    for orig, val in zip(originals, row):
+        agg[orig] = agg.get(orig, 0.0) + float(val)
+
+    factors = [
+        {"feature": f, "value": project_row[f], "contribution": round(v, 4)}
+        for f, v in agg.items()
+    ]
+    factors.sort(key=lambda d: d["contribution"], reverse=True)
+    return [c for c in factors if c["contribution"] > 0][:top_k]
