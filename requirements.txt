@@ -1,10 +1,7 @@
 # ---------------------------------------------------------------------------
-# SECO Risk Radar - core runtime dependencies
+# SECO ERA Expert System - core runtime dependencies
 # ---------------------------------------------------------------------------
-# These are everything you need to run the full pipeline, train the model,
-# score the portfolio, and launch the dashboard. Pinned with lower bounds so
-# the project keeps working as patch releases land, while staying within the
-# major versions it was developed and tested against.
+
 pandas>=2.2,<4
 numpy>=1.26,<3
 scikit-learn>=1.4,<2
@@ -12,22 +9,6 @@ joblib>=1.3
 PyYAML>=6.0
 streamlit>=1.33
 matplotlib>=3.7
-
-# ---------------------------------------------------------------------------
-# Optional extras - the product runs fully without these.
-# ---------------------------------------------------------------------------
-# `shap`        -> richer local explanations behind the explain.shap_local flag.
-#                  Without it, the built-in model-agnostic ablation explainer is
-#                  used (no extra install needed).
-# `anthropic` / `openai` -> natural-language inspector briefings. Without a key,
-#                  briefings fall back to a deterministic template. Set
-#                  ANTHROPIC_API_KEY or OPENAI_API_KEY to enable the LLM path.
-#
-# Install with:  pip install -r requirements.txt shap anthropic openai
-#
-# shap>=0.44
-# anthropic>=0.34
-# openai>=1.40
 
 # ---------------------------------------------------------------------------
 # Dev / test
