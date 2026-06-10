@@ -1,191 +1,329 @@
-# SECO Risk Radar 🏗️
+# ERA Expert System
 
-**Predictive technical-risk scoring for construction projects.**
-A mini "Building Intelligence" product that turns public Luxembourg construction
-data into a ranked work-list, so a SECO inspection planner can send scarce
-expert inspectors to the projects most likely to have defects — *first*.
+Early Risk Assessment Expert System, built for SECO technical control.
 
-> Score → explanation → focus areas → inspector briefing, for every project in a
-> portfolio.
+ERA turns public Luxembourg construction data into a decision-support layer for
+inspection planning. For every project in a portfolio it produces a predicted
+technical-risk band (Low, Medium, High), a continuous risk index from 0 to 100,
+and the specific factors driving that score. The point is to let SECO manage an
+inspection portfolio by predicted risk instead of by intuition or order of
+arrival, and to allocate scarce expert capacity, including the seniority of the
+assigned inspector, to where risk is highest.
 
----
+The model triages. The expert decides. ERA exists to make that triage
+consistent, explainable, and defensible.
 
-## TL;DR
+## Quickstart
 
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-python scripts/01_run_pipeline.py   # ingest (STATEC) → synthesize portfolio → SQLite
-python scripts/02_train.py          # train + benchmark models, persist the winner
-python scripts/03_predict.py        # score portfolio + compute per-project focus areas
-python scripts/04_risk_map.py       # render the canton risk map (PNG)
-streamlit run app/app.py            # open the inspector triage dashboard
+python scripts/01_run_pipeline.py   # ingest real STATEC priors, synthesize portfolio, write SQLite
+python scripts/02_train.py          # benchmark two models, deploy the better one
+python scripts/03_predict.py        # score every project, store predictions and drivers
+python scripts/04_risk_map.py       # render the canton risk map
+streamlit run app/app.py            # open the dashboard
 ```
 
-No API keys required. Everything runs offline and is reproducible (seeded).
+Everything runs offline and is reproducible from a fixed seed. No API keys are
+required. An optional language-model briefing and an optional SHAP explainer
+activate only if their dependencies are present, and the product degrades
+cleanly to deterministic fallbacks when they are not.
 
----
+The remaining sections answer the questions in the brief, then go beyond them to
+the part that actually decides whether a tool like this succeeds: the operating
+model, change management, and adoption.
 
-## 1. What problem am I solving, and for whom?
+## 1. What problem is being solved, and for whom?
 
-**User: a SECO inspection planner / risk officer.**
+The user is a SECO inspection planner or technical-control coordinator.
 
-SECO inspects buildings and infrastructure and assesses technical risk. But there
-are always more projects than inspector-hours. Today that prioritisation is
-**expert-driven and qualitative**: it depends on who reads the file, similar
-projects can be treated differently, and a genuinely high-risk project can slip
-down the queue and only get attention once a defect has already cost money.
+The structural problem is a supply-and-demand mismatch. There are always more
+projects to inspect than there are inspector-hours, and the scarcest resource of
+all is senior inspector time. Today the decision of where that time goes is
+largely qualitative. It depends on who reads the file, similar projects can be
+handled differently by different people, and a genuinely high-risk project can
+sit in the queue until a defect has already become expensive.
 
-**SECO Risk Radar** gives the planner a consistent, explainable first pass:
+The correct way to frame this is as a portfolio allocation problem. On one side
+there is a portfolio of incoming projects with heterogeneous and unobserved
+risk. On the other side there is a finite, heterogeneous supply of inspection
+capacity that ranges from junior to highly experienced. The allocation that
+maximises caught defects per inspector-hour is straightforward in principle:
+rank the portfolio by predicted risk, direct the most experienced inspectors and
+the most intensive control to the riskiest projects, and route low-risk work to
+lighter-touch or desk review. The reason this is not done systematically today
+is that the ranking does not exist in a consistent, defensible form. ERA
+produces exactly that ranking, plus the rationale that makes the resulting
+assignment auditable.
 
-- every project gets a **risk band** (Low / Medium / High) and a continuous
-  **priority score** (0–1) to sort the portfolio;
-- every score comes with its **drivers / focus areas** (the *why*), and an
-  optional natural-language **inspector briefing**;
-- a **canton risk map** shows *where* risk concentrates, so capacity can be
-  weighted by geography as well as by individual project.
+Concretely, for each project ERA outputs:
 
-It does **not** replace the expert — it routes expert attention. The KPI it moves
-is exactly the one in the role brief: *number of high-risk issues caught early,
-prioritisation consistency, and expert-time allocation.*
+- a risk band (Low, Medium, High) and a 0 to 100 risk index for sorting the
+  portfolio,
+- the factors driving the score, in the inspector's own vocabulary
+  (for example "Renovation", "Load-bearing masonry", "low contractor track
+  record"),
+- an optional plain-language briefing for the assigned inspector,
+- a geographic view showing how predicted risk is distributed across the
+  cantons.
+
+The metric ERA is built to move is the one in the role brief: high-risk issues
+caught early, consistency of prioritisation across planners, and efficient
+allocation of expert time.
 
 ## 2. Why is this relevant to SECO?
 
-- It is a direct embodiment of the AI & Data Engineer job ad: *construction risk,
-  technical inspection, predictive intelligence.*
-- It matches SECO's business model: SECO sells **independent risk assessment** to
-  developers and insurers. A predictive layer makes that advice more systematic
-  and scalable **without removing the human** — the model triages, the inspector
-  decides.
-- It is built around SECO's core asset — **accumulated technical data** — and
-  shows the shape of a product that would sit on top of real inspection history.
+SECO's business is independent technical control. It sells assurance about
+construction risk to developers, owners, and insurers, and that assurance is
+tied to liability over the long defect-liability period. The product SECO
+actually sells is judgement about where things go wrong.
 
-## 3. Which data sources did I use, and why?
+A predictive layer is valuable to that business for four reasons that compound:
 
-**Real, public, CC0:** STATEC *Autorisations de bâtir* (building permits) on
-[data.public.lu](https://data.public.lu/en/datasets/entreprises-construction-et-logement-autorisations-de-batir/).
-This is genuine Luxembourg construction activity by **building type × canton ×
-period**, under a Creative Commons Zero licence — fully open and reproducible,
-which the brief requires.
+1. Allocation. The marginal value of a senior inspector is far higher on a
+   high-risk project than on a routine one. Any tool that reliably sorts the
+   portfolio by risk lets SECO put its most expensive expertise where it pays
+   off, which is a direct efficiency gain on the firm's scarcest input.
+2. Early detection. A defect identified at design or early construction is far
+   cheaper to remedy than one found after handover, and far cheaper than one
+   that surfaces during the liability period. Moving detection earlier is money.
+3. Consistency and defensibility. A documented, reproducible risk rating reduces
+   the variance in how similar projects are treated, and gives SECO a clear,
+   auditable basis for its decisions if a rating is ever challenged by a client,
+   an insurer, or in a dispute.
+4. Data as an asset. SECO's accumulated inspection history is a moat. ERA shows
+   the shape of a product that sits on top of that history and turns it into a
+   repeatable, scalable capability rather than knowledge locked in individual
+   inspectors' heads.
 
-**The honest catch — and why it shapes the design:** this open dataset is
-**aggregate statistics** (counts and useful surface per type/geography), *not*
-per-project records, and it carries **no defect / risk outcome** (that data is
-SECO's confidential inspection history, which I don't have).
+None of this removes the human. It makes the human's judgement systematic.
 
-So I used a **hybrid** approach (the one Raimondo explicitly suggested):
+## 3. Which data sources were used, and why?
 
-1. **Base features sampled from the real distribution** — `ingest.py` records
-   provenance from the live data.public.lu API and builds a `(canton,
-   building_type)` sampling prior so the synthetic portfolio's **geography and
-   building mix are realistic** (Luxembourg-City and Esch dominate, single-dwelling
-   houses dominate by count, etc.).
-2. **A documented synthetic risk label** — `synthesize.py` attaches a `risk_severity`
-   target generated from a transparent latent function encoding domain
-   assumptions (renovations and load-bearing masonry are riskier than new
-   reinforced-concrete builds, winter starts are riskier, low contractor
-   experience is riskier, very small and very large projects are riskier…).
+The real, public, openly licensed source is STATEC Autorisations de batir
+(building permits) on data.public.lu, published under Creative Commons Zero.
+This is genuine Luxembourg construction activity broken down by building type,
+canton, and period. It is fully open and reproducible, which the brief requires.
 
-This is deliberately **not** a trick:
+The honest constraint, which shapes the entire design, is that this open dataset
+is aggregate statistics, not per-project records, and it carries no defect or
+risk outcome. The data that would carry a real risk label is SECO's confidential
+inspection history, which is not available for a take-home.
 
-- the latent function mixes several drivers, with **genuine Gaussian noise**, a
-  **non-linear (U-shaped) size effect**, and a **masonry × renovation interaction**;
-- I injected a **red-herring feature** (`permit_processing_days`) that does *not*
-  affect risk, so a good model must learn to ignore it.
+The response is a hybrid approach, which is the one suggested in the brief, and
+which I consider the only honest option given the data:
 
-> A second dataset, Kaggle's *Infrastructure Structural Defects*, inspired the
-> feature schema (`Infrastructure_Type`, `Severity_Level`, …). I adapted that
-> structure to project level rather than using it directly, to keep one coherent
-> Luxembourg-grounded story.
+1. Base features are sampled from the real distribution. The ingest step records
+   provenance from the live data.public.lu API and builds a sampling prior over
+   building type and canton, so that the synthetic portfolio's geography and
+   building mix match reality. Luxembourg City and Esch dominate by volume,
+   single-dwelling housing dominates by count, and so on.
+2. A documented synthetic risk label is attached. The label is generated from a
+   transparent latent function that encodes construction-domain assumptions:
+   renovations and load-bearing masonry are riskier than new reinforced-concrete
+   builds, winter starts are riskier than summer, low contractor experience and
+   high site complexity raise risk, and both very small and very large projects
+   are riskier than mid-sized ones.
+
+This is deliberately not a model that is rigged to look good. The latent function
+mixes several drivers, adds genuine Gaussian noise so the label is probabilistic
+rather than deterministic, includes a non-linear (U-shaped) size effect, and
+includes an interaction term where the combination of load-bearing masonry and
+renovation is disproportionately risky. It also includes a deliberate red-herring
+feature, permit processing time, that has no effect on risk, so that a good model
+has to learn to ignore it. The fact that it does (see Results) is part of the
+evidence that the pipeline behaves correctly.
 
 ## 4. Technical decisions and trade-offs
 
-| Decision | Why | Trade-off I accepted |
+| Decision | Reasoning | Trade-off accepted |
 |---|---|---|
-| **SQLite** for storage | Zero-infra, file-based, fully reproducible, trivially inspectable. The schema is layered (`provenance → projects → predictions`) to show data lineage. | Not concurrent / not a warehouse. Maps cleanly onto Postgres + dbt later. |
-| **Streamlit** for the UI | Fastest path to a *usable, data-rich* triage dashboard for one engineer on a short budget. The value is in the data + model + explanations. | React is SECO's stack and the right production choice for a multi-user, branded, role-aware app. Streamlit is the MVP trade. |
-| **scikit-learn**, two models | I benchmark a **logistic-regression baseline** against a **gradient-boosted** model and *deploy whichever wins on held-out macro-F1* — honest and data-driven, not "fancy model by default". | On this (mostly additive) synthetic label the **regularised linear model wins**, so it ships. I keep HGB because on SECO's richer real data with stronger interactions I'd expect it to pull ahead. |
-| **Preprocessing inside the Pipeline** | One-hot + scaling live in the persisted artifact → no train/serve skew; raw rows score directly. | Slightly less control than a hand-rolled feature store. |
-| **Ablation/occlusion** for local explanations | Attributes risk in the **original, human-readable feature space** ("Renovation", "Load-bearing masonry") — an inspector's vocabulary — with no extra dependency. | SHAP gives game-theoretically "purer" values; it's wired in behind an optional flag (`explain.shap_local`). |
-| **LLM briefing is optional** | The LLM only *translates* the structured drivers into prose. If no API key is set, a deterministic template produces the same content. | Briefing prose is plainer without a key — but the product is fully functional and reproducible offline. The LLM is never on the critical path. |
+| SQLite for storage | Zero infrastructure, file-based, reproducible, trivially inspectable. The schema is layered (provenance, then projects, then predictions) to make data lineage explicit. | Not concurrent and not a warehouse. Maps cleanly onto Postgres later without changing the application logic. |
+| Streamlit for the interface | Fastest path to a usable, data-rich decision-support interface for one engineer on a short budget. The value is in the data, the model, and the explanations, not in bespoke front-end work. | React is SECO's production stack and the right choice for a multi-user, role-aware, branded application. Streamlit is the deliberate prototype trade. |
+| scikit-learn, two models benchmarked | A regularised logistic-regression baseline is benchmarked against a gradient-boosted model, and whichever wins on held-out macro F1 is deployed automatically. This is honest and data-driven rather than reaching for the fanciest model by default. | On this largely additive synthetic label the linear model wins and ships. The gradient-boosted model is retained because on SECO's richer real data, with stronger interactions, it would be expected to pull ahead, and the harness will pick it up automatically when it does. |
+| Preprocessing inside the model pipeline | One-hot encoding and scaling live inside the persisted artifact, which removes any train-serve skew and lets raw project rows be scored directly. | Slightly less control than a separate feature store, which is the right structure only at a larger scale. |
+| Ablation for local explanations | Attributes risk in the original, human-readable feature space, which is the inspector's vocabulary, with no extra dependency. | SHAP produces game-theoretically purer values. It is wired in as an optional path that auto-selects the correct explainer for the deployed model (linear or tree), and it has been verified to agree with the ablation method on the same top drivers. |
+| Language-model briefing is optional | The model only translates the structured drivers into prose. With no API key, a deterministic template produces the same content. The language model is never on the critical path. | Briefing prose is plainer without a key. The product is fully functional and reproducible offline. |
 
-## 5. Production tomorrow vs. throw away
+## 5. What would ship to production tomorrow, and what would be replaced?
 
-**Ship tomorrow (it's already the right shape):**
-- the layered pipeline + provenance audit trail;
-- the `Pipeline`-wrapped model with automatic baseline benchmarking and
-  best-model selection;
-- explainability in the inspector's own vocabulary;
-- the triage dashboard pattern (rank → filter → drill-down → briefing).
+What is already the right shape and would ship:
 
-**Throw away / replace:**
-- the **synthetic risk label** — replace it with SECO's real historical inspection
-  outcomes. The pipeline is built so this is a *label-source swap + retrain*, not a
-  rewrite.
-- the offline sampling prior — replace with the parsed **LUSTAT SDMX** feed and,
-  ideally, project-level permit records;
-- SQLite → managed Postgres; Streamlit → a React front-end on a scoring API.
+- the layered pipeline with a provenance audit trail,
+- the pipeline-wrapped model with automatic benchmarking and best-model
+  selection,
+- explanations in the inspector's vocabulary, with two methods that
+  cross-validate each other,
+- the decision-support pattern of rank, filter, drill down, brief, and the
+  risk-based allocation workflow it supports.
 
-## 6. If I had 3 more months
+What would be replaced:
 
-- **Real labels + calibration.** Train on SECO inspection history; calibrate
-  probabilities (reliability curves) and tune the High-risk recall threshold,
-  because in triage **missing a high-risk project costs more than a false alarm**.
-- **Documents, not just tabular.** Add an OCR + LLM/RAG layer over inspection
-  reports and permit PDFs to extract structured risk signals (the Kaggle
-  `dacl10k` concrete-defect images are a natural computer-vision extension).
-- **Monitoring.** Data-drift and performance dashboards, plus an inspector
-  feedback loop (was the flag useful?) to retrain on.
-- **Productionisation.** FastAPI scoring service + React UI + role-based access,
-  SHAP explanations served alongside scores, and an experiment-tracking setup.
+- the synthetic risk label, replaced by SECO's real historical inspection
+  outcomes. The system is built so that this is a label-source swap and a
+  retrain, not a rewrite. This is the single most important property of the
+  design.
+- the offline sampling prior, replaced by the parsed LUSTAT SDMX feed and,
+  ideally, project-level permit records,
+- SQLite, replaced by managed Postgres, and Streamlit, replaced by a React
+  front-end over a scoring API.
 
----
+## 6. With three more months
+
+- Real labels and calibration. Train on SECO inspection history, calibrate the
+  probabilities, and tune the High-risk recall threshold, because in this
+  setting a missed high-risk project costs far more than a false alarm, so the
+  operating point should be chosen deliberately rather than left at the default.
+- Documents, not just tabular data. Add an extraction layer over inspection
+  reports and permit PDFs, and a computer-vision component over defect imagery,
+  to pull structured risk signals out of unstructured records.
+- Monitoring and a feedback loop. Track data drift and model performance, and
+  capture inspector overrides and outcomes as new training signal.
+- An allocation layer. Turn the risk ranking into an actual assignment under
+  capacity constraints, matching inspector seniority to project risk
+  automatically, which is the subject of the next section.
+
+## Operating model, change management, and adoption
+
+The model is the easy part. Whether a tool like this delivers value depends
+almost entirely on the operating model it enables and on whether the people who
+do the work adopt it. This section is the part that matters most for the next
+steps.
+
+### The operating-model shift: managing the portfolio by risk
+
+Today the inspection portfolio is handled largely first-come and by individual
+judgement. ERA enables a different operating model: a risk-based portfolio.
+Incoming projects are ranked by their risk index, and the response is tiered to
+the band. High-risk projects receive intensive technical control and are
+assigned to the most experienced inspectors. Medium-risk projects receive
+standard review. Low-risk projects receive lighter-touch or desk-based review.
+
+The central lever is the assignment of the riskiest portfolio to the most
+experienced inspector. This is not a stylistic preference, it follows from the
+economics. A senior inspector's comparative advantage is detecting subtle,
+high-consequence defects that a junior inspector would miss. Spending that
+capacity on low-risk, routine work is the single largest avoidable waste of the
+firm's scarcest resource. By producing a defensible ranking and the reasons
+behind it, ERA lets a planner concentrate senior expertise where its marginal
+value is highest, and lets junior inspectors safely handle the long tail of
+low-risk work, with the rationale documented in case the assignment is ever
+questioned.
+
+### Adoption is a trust problem, not a technology problem
+
+Inspectors are experienced professionals who are accountable for their
+judgement. They will not, and should not, defer to a black box. The design
+choices that look technical are in fact the adoption mechanism:
+
+- Explanations in the inspector's own vocabulary exist so that a person can
+  audit the reasoning and decide whether to trust it on a given project. A score
+  without a reason gets ignored. A score with a reason the inspector recognises
+  gets used.
+- The factors the model considers are documented in plain language in the
+  application, so the basis of a rating is never hidden.
+- The system is explicitly positioned as routing attention, not making the call.
+  The inspector remains the decision-maker and remains accountable. This is both
+  the correct safety posture and the thing that makes adoption possible, because
+  it does not threaten the inspector's professional authority or deskill the
+  role.
+
+### A phased rollout that earns trust before it influences decisions
+
+1. Shadow mode. Run ERA alongside the existing process without letting it change
+   any decision. Compare its rankings to what planners and inspectors actually
+   did, and to outcomes where available. This builds an evidence base and
+   surfaces where the model is weak before anything is at stake.
+2. Assisted mode. Let ERA inform triage and assignment, with every override
+   logged. Overrides are not failures, they are the most valuable signal in the
+   system: they show where the model and the expert disagree, and they become
+   training data.
+3. Embedded mode. Once trust is established and measured, integrate the ranking
+   and assignment into the normal planning workflow, still advisory, still with
+   the human accountable.
+
+### Governance and the failure modes to manage
+
+- Auditability. The provenance, projects, and predictions layers, together with
+  versioned models, mean any rating can be reconstructed and explained after the
+  fact. This matters for a firm whose product is independent, defensible
+  judgement.
+- Automation bias is the main risk. The danger is not that the model is wrong
+  occasionally, it is that people stop thinking and treat the score as truth.
+  Mitigations: keep the tool advisory, never let it become an automatic pass or
+  fail, surface uncertainty, and keep accountability with the human.
+- Adoption metrics. Track the override rate trending down as trust grows, the
+  time taken to triage a portfolio, the share of genuinely high-risk projects
+  caught early, the volume of senior inspector-hours reallocated from low-risk to
+  high-risk work, and the reduction in variance between how different planners
+  handle comparable projects. These measure whether the operating model is
+  actually changing, which is the real objective.
 
 ## Architecture
 
 ```
-data.public.lu (STATEC, CC0)            ┌─────────────────────────────┐
-        │  ingest.py (provenance+prior) │  Streamlit triage dashboard │
-        ▼                               │  rank · filter · drill-down │
-  synthesize.py  ──►  SQLite  ──►  model.py  ──►  explain.py  ──►  briefing.py
-  (hybrid data)      projects/    (LR vs HGB,    (focus areas)   (LLM or template)
-                     predictions   best wins)
+data.public.lu (STATEC, CC0)
+        |
+        v
+  ingest.py        record provenance, build a real building-mix sampling prior
+        |
+        v
+  synthesize.py    hybrid portfolio: real prior plus a documented synthetic label
+        |
+        v
+  SQLite           provenance -> projects -> predictions (explicit lineage)
+        |
+        v
+  model.py         benchmark logistic regression vs gradient boosting, deploy the winner
+        |
+        v
+  explain.py       global importance and per-project drivers (ablation, optional verified SHAP)
+        |
+        v
+  briefing.py      inspector briefing (language model or deterministic template)
+        |
+        v
+  app/app.py       dashboard: portfolio triage, score a building, geographic risk, factors
+  geo.py           per-canton risk aggregation and map (real boundaries, offline fallback)
 ```
 
-## Results (held-out test set, n_test = 375, seed = 42)
+## Results (held-out test set, n_train = 1125, n_test = 375, seed = 42)
 
-| Model | Accuracy | Macro-F1 | High-risk recall |
+| Model | Accuracy | Macro F1 | High-risk recall |
 |---|---|---|---|
-| Majority baseline | 0.55 | — | — |
-| Logistic Regression **(deployed)** | **0.731** | **0.669** | 0.603 |
-| Gradient Boosting | 0.680 | 0.609 | 0.485 |
+| Majority-class baseline | 0.55 | n/a | n/a |
+| Logistic regression (deployed) | 0.731 | 0.669 | 0.603 |
+| Gradient boosting | 0.680 | 0.609 | 0.485 |
 
-Sanity check: the red-herring feature `permit_processing_days` ranks **13th of 14**
-by permutation importance — the model correctly learned to ignore it.
+Sanity check: the red-herring feature, permit processing time, ranks 13th of 14
+by permutation importance. The model correctly learned that it carries no risk
+signal.
 
-**On evaluation honesty:** these metrics validate the **pipeline, the product, and
-the UX end-to-end**. They are *not* a claim of real-world predictive validity,
+On evaluation honesty: these numbers validate the pipeline, the product, and the
+end-to-end workflow. They are not a claim of real-world predictive validity,
 because the label is synthetic. Real validity requires SECO's labelled inspection
-data — at which point the same code retrains and the same dashboard works.
+data, at which point the same code retrains and the same application works
+unchanged.
 
 ## Repository layout
 
 ```
 src/seco_risk_radar/
-  config.py       paths, seed, real STATEC dataset/resource IDs
-  taxonomy.py     real LU cantons/regions + STATEC building types
-  ingest.py       fetch provenance + build real-data sampling prior (offline fallback)
-  synthesize.py   hybrid portfolio: real prior + documented synthetic label
-  database.py     SQLite schema + load/read helpers
-  features.py     feature definitions + preprocessing (no leakage)
-  model.py        train/benchmark/deploy + scoring
-  explain.py      global importance + local ablation attributions (+ optional SHAP)
-  briefing.py     LLM inspector briefing with template fallback
-  geo.py          per-canton risk aggregation + map (real boundaries, offline fallback)
-scripts/          01_run_pipeline · 02_train · 03_predict · 04_risk_map
-app/app.py        Streamlit dashboard (Portfolio + Risk map tabs)
-tests/            synthesize / features / database
+  config.py       paths, seed, real STATEC dataset and resource identifiers
+  taxonomy.py     real Luxembourg cantons and regions, STATEC building types
+  ingest.py       fetch provenance and build the real-data sampling prior (offline fallback)
+  synthesize.py   hybrid portfolio: real prior plus a documented synthetic label
+  database.py     SQLite schema and load/read helpers
+  features.py     feature definitions and leakage-safe preprocessing
+  model.py        train, benchmark, deploy, and score
+  explain.py      global importance and local ablation attributions, plus optional SHAP
+  briefing.py     inspector briefing with a deterministic template fallback
+  geo.py          per-canton risk aggregation and map (real boundaries, offline fallback)
+scripts/          01_run_pipeline, 02_train, 03_predict, 04_risk_map
+app/app.py        dashboard (portfolio triage, score a building, geographic risk, factors)
+tests/            synthesize, features, database
 ```
 
 ## Tests
@@ -196,11 +334,10 @@ pip install pytest && pytest -q
 
 ## Data licence
 
-STATEC *Autorisations de bâtir* is published under **Creative Commons Zero (CC0)**.
-All synthetic data in this repo is generated locally and reproducibly.
+STATEC Autorisations de batir is published under Creative Commons Zero (CC0). All
+synthetic data in this repository is generated locally and reproducibly.
 
-The map view uses canton boundaries from *Cantons in Luxembourg 2024* (SIG-GR /
-GIS-GR, [data.public.lu](https://data.public.lu/en/datasets/cantons-in-luxembourg-2024/)),
-licensed **CC-BY 4.0**. They are downloaded on first use and cached under
-`data/geo/`; if the portal is unreachable the map falls back to a centroid
-bubble map, so nothing hard-fails offline.
+The map uses canton boundaries from Cantons in Luxembourg 2024 (SIG-GR / GIS-GR,
+data.public.lu), licensed CC-BY 4.0. They are downloaded on first use and cached
+locally. If the portal is unreachable, the map falls back to a centroid bubble
+map, so nothing fails when offline.
