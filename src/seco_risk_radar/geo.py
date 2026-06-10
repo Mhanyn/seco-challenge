@@ -1,29 +1,3 @@
-"""Geospatial risk view: aggregate predicted risk by Luxembourg canton and
-render a map.
-
-Design notes (defensible choices):
-
-* **Real geometry, fetched at runtime.** Canton boundaries come from the
-  official Luxembourg open-data portal ("Cantons in Luxembourg 2024",
-  CC-BY 4.0). We do not vendor the 450 KB file into the repo; instead we
-  download it once and cache it under ``data/geo/``. This mirrors the rest of
-  the pipeline, which grounds itself in live STATEC data but degrades
-  gracefully offline.
-* **Graceful offline fallback.** If the boundaries cannot be fetched (no
-  network, portal down), we fall back to a *bubble map* drawn at hard-coded
-  canton centroids. The product still answers "where is the risk?" — just with
-  circles instead of filled polygons. Nothing hard-fails.
-* **One renderer, no heavy GIS stack.** We parse the GeoJSON with the standard
-  library and draw with matplotlib only (no geopandas/plotly). The same
-  ``build_risk_map`` function powers both the CLI script and the Streamlit tab,
-  so there is a single code path to reason about.
-
-Attribution for the boundary data (required by CC-BY 4.0):
-    Cantons in Luxembourg 2024 — SIG-GR / GIS-GR 2024, data.public.lu,
-    licensed CC-BY 4.0. Sources: GeoBasis-DE/BKG, IGN France, NGI-Belgium,
-    ACT Luxembourg, Statbel, et al.
-"""
-
 from __future__ import annotations
 
 import json
