@@ -15,20 +15,6 @@ This is the "hybrid" core of the project:
   "scope a challenge version with synthetic data ... each with features and a
   label: high/medium/low risk."
 
-Why this is honest, not a trick
--------------------------------
-A naive synthetic label that is a deterministic function of the features would
-let any model trivially "memorise" it, telling us nothing. We avoid that:
-
-1. The latent score mixes several drivers with realistic, documented weights.
-2. We add genuine Gaussian noise, so the relationship is probabilistic.
-3. We add a NON-LINEAR (U-shaped) size effect and an interaction term.
-4. We add RED-HERRING features (e.g. permit_processing_days) that do NOT
-   influence risk, so a good model must learn to ignore them.
-
-The result: the modelling task is non-trivial, the evaluation is meaningful as
-a test of the *pipeline and product*, and the README is explicit that real
-predictive validity requires SECO's real labels (swap the label source, rerun).
 """
 
 from __future__ import annotations
